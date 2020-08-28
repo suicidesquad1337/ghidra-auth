@@ -1,17 +1,25 @@
 #![deny(rust_2018_idioms)]
 #![warn(clippy::pedantic)]
 
-use rocket::{http::RawStr, launch, request::FromForm};
+use rocket::{launch, post, routes};
+use rocket_contrib::{
+    json,
+    json::{Json, JsonValue},
+};
+use serde::{Deserialize, Serialize};
 
-use rocket_contrib::serve::{crate_relative, StaticFiles};
+#[derive(Debug, Serialize, Deserialize)]
+struct Register {
+    username: String,
+    password: String,
+}
 
-#[derive(FromForm)]
-struct UserLogin<'r> {
-    username: &'r RawStr,
-    password: &'r RawStr,
+#[post("/register", format = "json", data = "<user>")]
+fn register(user: Json<Register>) -> JsonValue {
+    json!({ "status": "ok" })
 }
 
 #[launch]
 fn rocket() -> rocket::Rocket {
-    rocket::ignite().mount("/", StaticFiles::from(crate_relative!("/static")))
+    rocket::ignite().mount("/", routes![register])
 }
