@@ -1,5 +1,5 @@
 use super::Result;
-use std::{process::Stdio, path::PathBuf};
+use std::{path::PathBuf, process::Stdio};
 use tokio::{process::Command, sync::Mutex};
 
 pub struct GhidraServer {
@@ -23,18 +23,32 @@ impl GhidraServer {
         })
     }
 
-    pub async fn add_user(&self, user: &str) -> Result<()> {
+    pub async fn add_user(&self, user: &str) -> Result<(), ()> {
         let path = self.admin_path.lock().await;
         let output = Command::new(&*path)
             .current_dir(path.parent().unwrap())
             .stderr(Stdio::piped())
             .args(&["-add", user])
-            .output().await?;
+            .output()
+            .await
+            .map_err(|err| {
+                log::error!("failed to spawn `svrAdmin` process: {}", err);
+                ()
+            })?;
 
         if output.status.success() {
             Ok(())
         } else {
-            Err(format!("{}", String::from_utf8_lossy(&output.stderr)).into())
+            log::error!("failed to create user");
+            log::error!(
+                "svrAdmin stdout: {}",
+                String::from_utf8_lossy(&output.stdout).trim()
+            );
+            log::error!(
+                "svrAdmin stderr: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            );
+            Err(())
         }
     }
 }

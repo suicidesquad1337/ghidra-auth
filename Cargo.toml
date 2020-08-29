@@ -10,3 +10,5 @@ rocket = { git = "https://github.com/SergioBenitez/Rocket" }
 rocket_contrib = { git = "https://github.com/SergioBenitez/Rocket" }
 dotenv = "0.15"
 tokio = { version = "0.2", features = ["process", "sync"] }
+log = "0.4"
+env_logger = "0.7"

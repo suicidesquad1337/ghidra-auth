@@ -3,13 +3,14 @@
 
 mod ghidra;
 
+use ghidra::GhidraServer;
 use rocket::{
-    http::RawStr, post,
+    http::RawStr,
+    post,
     request::{Form, FromForm, FromFormValue},
     routes, State,
 };
 use rocket_contrib::serve::{crate_relative, StaticFiles};
-use ghidra::GhidraServer;
 
 pub type Result<T, E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 
@@ -31,25 +32,29 @@ impl<'r> FromFormValue<'r> for NonEmptyStr<'r> {
 #[derive(Debug, FromForm)]
 struct Register<'r> {
     username: Result<NonEmptyStr<'r>, &'static str>,
-    password: Result<NonEmptyStr<'r>, &'static str>,
 }
 
 #[post("/register", data = "<user>")]
-fn register(ghidra: State<'_, GhidraServer>, user: Form<Register<'_>>) -> Result<String, String> {
-    let (username, password) = {
-        let Register { username, password } = user.into_inner();
-        if username.is_err() {
+async fn register(
+    ghidra: State<'_, GhidraServer>,
+    user: Form<Register<'_>>,
+) -> Result<String, String> {
+    let username = {
+        let Register { username } = user.into_inner();
+        if let Ok(username) = username {
+            username
+        } else {
             return Err("`username` can not be empty".to_string());
         }
-
-        if password.is_err() {
-            return Err("`password` can not be empty".to_string());
-        }
-
-        (username.unwrap(), password.unwrap())
     };
 
-    Ok("".to_string())
+    if let Err(_) = ghidra.add_user(username.0).await {
+        Err("Failed to create your account.".to_string())
+    } else {
+        Ok("Successfully created your account.\
+            Now login using `changeme` as the password and change your password"
+            .to_string())
+    }
 }
 
 fn rocket(ghidra: GhidraServer) -> rocket::Rocket {
@@ -61,6 +66,7 @@ fn rocket(ghidra: GhidraServer) -> rocket::Rocket {
 
 #[rocket::main]
 async fn main() -> Result<()> {
+    env_logger::init();
     dotenv::dotenv()?;
     let path = std::env::var("GHIDRA_SERVER_DIRECTORY")
         .map_err(|_| "you have to set the `GHIDRA_SERVER_DIRECTORY` env var")?;
