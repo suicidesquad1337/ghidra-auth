@@ -15,23 +15,25 @@ use rocket_contrib::serve::{crate_relative, StaticFiles};
 pub type Result<T, E = Box<dyn std::error::Error>> = std::result::Result<T, E>;
 
 #[derive(Debug)]
-struct NonEmptyStr<'r>(&'r str);
+struct EscapedUsername<'r>(&'r str);
 
-impl<'r> FromFormValue<'r> for NonEmptyStr<'r> {
+impl<'r> FromFormValue<'r> for EscapedUsername<'r> {
     type Error = &'static str;
 
-    fn from_form_value(form_value: &'r RawStr) -> Result<Self, Self::Error> {
-        if form_value.is_empty() {
-            Err("value can not be empty")
+    fn from_form_value(val: &'r RawStr) -> Result<Self, Self::Error> {
+        if val.is_empty() {
+            Err("username can not be empty")
+        } else if val.chars().any(|c| !c.is_alphabetic() || c.is_whitespace()) {
+            Err("username can only contain alphabetic letters")
         } else {
-            Ok(NonEmptyStr(form_value.as_str()))
+            Ok(EscapedUsername(val.as_str()))
         }
     }
 }
 
 #[derive(Debug, FromForm)]
 struct Register<'r> {
-    username: Result<NonEmptyStr<'r>, &'static str>,
+    username: Result<EscapedUsername<'r>, &'static str>,
 }
 
 #[post("/register", data = "<user>")]
@@ -66,7 +68,6 @@ fn rocket(ghidra: GhidraServer) -> rocket::Rocket {
 
 #[rocket::main]
 async fn main() -> Result<()> {
-    env_logger::init();
     dotenv::dotenv()?;
     let path = std::env::var("GHIDRA_SERVER_DIRECTORY")
         .map_err(|_| "you have to set the `GHIDRA_SERVER_DIRECTORY` env var")?;
